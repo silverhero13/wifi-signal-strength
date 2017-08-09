@@ -81,15 +81,6 @@ to move-internet-particles
   ask internet-particles [
 
 
-;    if heading >= 0 and heading <= 90 [
-;      if pcolor = white [set heading 180 - heading]
-;      if pcolor = gray [set heading 360 - heading ] ]
-;
-;    if heading >= 90 and heading <= 180 [
-;      if pcolor = white [set heading 180 - heading]
-;      if pcolor = gray [set heading 360 - heading ] ]
-;    ifelse pcolor = white
-;    [set heading 180 - heading ]
 
     ifelse pcolor = white or pcolor = gray
     [set loss-from-attenuation loss-from-attenuation + 5]
