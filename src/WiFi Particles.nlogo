@@ -1,15 +1,18 @@
-globals [ floorplans max-db forwards-count ]
+globals [ floorplans max-db forwards-count power-output]
 
 breed [ routers router ]
 breed [ internet-particles internet-particle ]
 
-internet-particles-own [free-space-path-loss loss-from-attenuation distance-from-router]
+internet-particles-own [free-space-path-loss loss-from-attenuation distance-from-router signal-strength]
+patches-own [attenuation]
 
 to setup
   ca
 
-  set max-db 86
+  ask patches[ set attenuation 0 ]
+
   set forwards-count 0
+  set power-output (10 * (log router-power 10)) + 30
   set-house-coordinates
   draw-house-floor-plan
 
@@ -27,13 +30,12 @@ to go
   configure-router-position
 
   let counter 0
-;  if timer > spawn-interval [ generate-internet-particles reset-timer ]
   if forwards-count = 0
   [generate-internet-particles]
 
 
   move-internet-particles ; forwards the internet particles and calculates the free space path loss and loss from attenuation
-  change-internet-particle-state ; kills the internet particle if it is outside the world and changes its color
+  change-internet-particle-state ; kills the internet particle if it is outside the world; also changes its color
 
   set forwards-count forwards-count + 1
 
@@ -66,25 +68,16 @@ end
 
 to move-internet-particles
   ask internet-particles [
-    if random 100 + 1 <= reflection-probability [
-      if [pcolor] of patch-ahead 1 = white [set heading 180 - heading set loss-from-attenuation loss-from-attenuation + 5]
-      if [pcolor] of patch-ahead 1 = gray [set heading 360 - heading set loss-from-attenuation loss-from-attenuation + 5]
-
-    ]
-  ]
-
-  ask internet-particles [
     fd 1
     set distance-from-router distance-from-router + 1
   ]
 
   ask internet-particles [
-
-
-
     ifelse pcolor = white or pcolor = gray
-    [set loss-from-attenuation loss-from-attenuation + 5]
+    [set loss-from-attenuation loss-from-attenuation + [attenuation] of patch-here]
     [set free-space-path-loss ((20 * log (distance-from-router / 10) 10) + (20 * log radio-wave-frequency 10) - 87.55)]
+
+    set signal-strength power-output - (free-space-path-loss + loss-from-attenuation)
   ]
 end
 
@@ -129,64 +122,14 @@ to die-when-outside
 end
 
 to change-color
-;  let ranges [0 .25 .375 .50 .55 .60 .65 .70 .75 .80 .85 .90 .95 1]
-;  let colors [
-;    violet
-;    (rgb 48 235 240)
-;    rgb 48 240 181
-;    rgb 48 240 112
-;    rgb 152 228 60
-;    rgb 208 223 65
-;    rgb 215 185 73
-;    rgb 215 158 75
-;    rgb 203 113 85
-;    rgb 195 93 93
-;    rgb 172 116 116
-;    rgb 148 140 140
-;    rgb 89 83 83
-;  ]
-  if (free-space-path-loss + loss-from-attenuation > (max-db * 0)) and  (free-space-path-loss + loss-from-attenuation <= (max-db * .25))
-  [ set color violet stop ]
+  ;let signal-strength [power-output] of routers-at router-x-coordinate router-y-coordinate - (free-space-path-loss + loss-from-attenuation)
 
-  if (free-space-path-loss + loss-from-attenuation > (max-db * .25)) and  (free-space-path-loss + loss-from-attenuation <= (max-db * .375))
-  [ set color rgb 48 235 240 stop]
-
-  if (free-space-path-loss + loss-from-attenuation > (max-db * .375)) and  (free-space-path-loss + loss-from-attenuation <= (max-db * .50))
-  [ set color rgb 48 240 181 stop]
-
-  if (free-space-path-loss + loss-from-attenuation > (max-db * .50)) and  (free-space-path-loss + loss-from-attenuation <= (max-db * .55))
-  [ set color rgb 48 240 112 stop ]
-
-  if (free-space-path-loss + loss-from-attenuation > (max-db * .55)) and  (free-space-path-loss + loss-from-attenuation <= (max-db * .60))
-  [ set color rgb 152 228 60 stop]
-
-  if (free-space-path-loss + loss-from-attenuation > (max-db * .60)) and  (free-space-path-loss + loss-from-attenuation <= (max-db * .65))
-  [ set color rgb 208 223 65 stop ]
-
-  if (free-space-path-loss + loss-from-attenuation > (max-db * .65)) and  (free-space-path-loss + loss-from-attenuation <= (max-db * .70))
-  [ set color rgb 215 185 73 stop]
-
-  if (free-space-path-loss + loss-from-attenuation > (max-db * .70)) and  (free-space-path-loss + loss-from-attenuation <= (max-db * .75))
-  [ set color rgb 215 158 75 stop ]
-
-  if (free-space-path-loss + loss-from-attenuation > (max-db * .75)) and  (free-space-path-loss + loss-from-attenuation <= (max-db * .80))
-  [ set color rgb 203 113 85 stop]
-
-  if (free-space-path-loss + loss-from-attenuation > (max-db * .80)) and  (free-space-path-loss + loss-from-attenuation <= (max-db * .85))
-  [ set color rgb 195 93 93 stop ]
-
-  if (free-space-path-loss + loss-from-attenuation > (max-db * .85)) and  (free-space-path-loss + loss-from-attenuation <= (max-db * .90))
-  [ set color rgb 172 116 116 stop]
-
-  if (free-space-path-loss + loss-from-attenuation > (max-db * .90)) and  (free-space-path-loss + loss-from-attenuation <= (max-db * .95))
-  [ set color rgb 148 140 140 stop ]
-
-  if (free-space-path-loss + loss-from-attenuation > (max-db * .95)) and  (free-space-path-loss + loss-from-attenuation <= max-db)
-  [ set color rgb 89 83 83 stop]
-
-  if (free-space-path-loss + loss-from-attenuation > max-db)
-  ; [ set color black stop]
-  [ die ]
+  if signal-strength > -50 [set color 54 stop]
+  if signal-strength > -60 [set color 44 stop]
+  if signal-strength > -70 [set color 24 stop]
+  if signal-strength > -80 [set color 14 stop]
+  if signal-strength > -100 [set color gray stop]
+  if signal-strength < -100 [set color black stop]
 end
 
 to draw-house-floor-plan ; change ni palihog ang code. kanang mas dali ma sabtan
@@ -195,17 +138,25 @@ to draw-house-floor-plan ; change ni palihog ang code. kanang mas dali ma sabtan
 
       foreach item 1 floorplan [ row -> ; draw the horizontal lines first
         foreach (range (item 0 item 1 row) (item 1 item 1 row + 1)) [ x ->
-          ask patches with [pxcor = x and pycor = item 0 row] [set pcolor white] ] ]
+          ask patches with [pxcor = x and pycor = item 0 row] [set pcolor gray set attenuation 20] ] ]
 
       foreach item 2 floorplan [ column -> ; draw the vertical lines first
         foreach (range (item 0 item 1 column) (item 1 item 1 column + 1)) [ y ->
-          ask patches with [pxcor = item 0 column and pycor = y] [set pcolor gray] ] ] ] ]
+          ask patches with [pxcor = item 0 column and pycor = y] [set pcolor gray set attenuation 20] ] ] ] ]
+
+  if floorplan-owner = "valerio" [
+    ask patches with [pxcor >= 2 and pxcor <= 29 and pycor >= 42 and pycor <= 79] [set pcolor 17]
+    ask patches with [pxcor >= 2 and pxcor <= 29 and pycor >= 2 and pycor <= 39] [set pcolor 47]
+    ask patches with [pxcor >= 31 and pxcor <= 58 and pycor >= 7 and pycor <= 34] [set pcolor 57]
+    ask patches with [pxcor >= 60 and pxcor <= 99 and pycor >= 7 and pycor <= 45] [set pcolor 27]
+    ask patches with [pxcor >= 75 and pxcor <= 99 and pycor >= 46 and pycor <= 69] [set pcolor 107]
+  ]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-478
+750
 10
-970
+1242
 503
 -1
 -1
@@ -230,10 +181,10 @@ ticks
 30.0
 
 BUTTON
-1
-13
-65
-46
+217
+351
+324
+424
 Setup
 setup
 NIL
@@ -247,10 +198,10 @@ NIL
 1
 
 BUTTON
-75
-13
-138
-46
+25
+461
+172
+501
 Go
 go
 T
@@ -264,82 +215,82 @@ NIL
 1
 
 CHOOSER
-0
-304
-148
-349
+25
+238
+172
+283
 radio-wave-frequency
 radio-wave-frequency
 2400000 5000000
 0
 
 INPUTBOX
-0
-184
-150
-244
+363
+412
+511
+472
 router-x-coordinate
-61.0
+55.0
 1
 0
 Number
 
 INPUTBOX
-162
-185
-313
-245
+514
+412
+663
+472
 router-y-coordinate
-32.0
+11.0
 1
 0
 Number
 
 SLIDER
-0
-355
-215
-388
+25
+351
+211
+384
 internet-particle-spawn-count
 internet-particle-spawn-count
 0
 500
-150.0
+50.0
 5
 1
 NIL
 HORIZONTAL
 
 CHOOSER
-0
-54
-138
-99
+25
+43
+172
+88
 floorplan-owner
 floorplan-owner
 "blank" "valerio"
 1
 
 SLIDER
-229
-355
-407
-388
+25
+390
+211
+423
 spawn-interval
 spawn-interval
 1
 20
-20.0
+3.0
 1
 1
 fd
 HORIZONTAL
 
 BUTTON
-150
-13
-229
-46
+177
+461
+324
+501
 Go Once
 go
 NIL
@@ -352,57 +303,379 @@ NIL
 NIL
 1
 
-SLIDER
+INPUTBOX
+25
+173
+172
+233
+router-power
+5.0
+1
 0
-394
-180
-427
-reflection-probability
-reflection-probability
-0
-100
+Number
+
+PLOT
+363
+39
+745
+320
+Signal Strength of Each Room Overtime
+Ticks
+Signal Strength
+0.0
+0.0
+0.0
+0.0
+true
+true
+"" ""
+PENS
+"Kitchen" 1.0 0 -8020277 true "" "plot mean [signal-strength] of internet-particles-on patches with [pcolor = 107]"
+"Living Room" 1.0 0 -612749 true "" "plot mean [signal-strength] of internet-particles-on patches with [pcolor = 27]"
+"Bed Room 1" 1.0 0 -1604481 true "" "plot mean [signal-strength] of internet-particles-on patches with [pcolor = 17]"
+"Bed Room 2" 1.0 0 -723837 true "" "plot mean [signal-strength] of internet-particles-on patches with [pcolor = 47]"
+"Bed Room 3" 1.0 0 -6565750 true "" "plot mean [signal-strength] of internet-particles-on patches with [pcolor = 57]"
+
+TEXTBOX
+6
+34
+35
+74
+1
+33
 15.0
 1
+
+TEXTBOX
+25
+10
+175
+38
+Select a floor plan to use for the simulation.
+11
+0.0
 1
-%
-HORIZONTAL
+
+TEXTBOX
+24
+87
+323
+105
+_________________________________________________
+11
+0.0
+1
+
+TEXTBOX
+25
+109
+320
+165
+Set the power of the router. This is usually its input power and can be found in its manuals, or at its back.\nAlso, you may set the radio wave frequency that the router emits.
+11
+0.0
+1
+
+TEXTBOX
+25
+282
+347
+324
+_________________________________________________
+11
+0.0
+1
+
+TEXTBOX
+25
+302
+323
+348
+Customize how the signals are repsented in this model. Change how many signal \"particles\" are created in every tick; you may also change the frequency of the signal creation.
+11
+0.0
+1
+
+TEXTBOX
+24
+421
+324
+439
+_________________________________________________
+11
+0.0
+1
+
+TEXTBOX
+25
+441
+175
+459
+Run the model.
+11
+0.0
+1
+
+TEXTBOX
+5
+165
+27
+205
+2
+33
+15.0
+1
+
+TEXTBOX
+1
+344
+26
+384
+3
+33
+15.0
+1
+
+TEXTBOX
+0
+453
+22
+493
+4
+33
+15.0
+1
+
+TEXTBOX
+363
+385
+513
+407
+Router Position
+18
+14.0
+1
+
+TEXTBOX
+363
+476
+744
+503
+You may play with the router's position by changing it manually. But, a much easier way is to click a patch in the world while the simulation is running.
+11
+0.0
+1
+
+TEXTBOX
+363
+10
+740
+33
+Signal Strength of Each Room Overtime
+18
+14.0
+1
+
+MONITOR
+363
+325
+430
+370
+Kitchen
+mean [signal-strength] of internet-particles-on patches with [pcolor = 107]
+1
+1
+11
+
+MONITOR
+443
+325
+510
+370
+LR
+mean [signal-strength] of internet-particles-on patches with [pcolor = 27]
+1
+1
+11
+
+MONITOR
+522
+325
+589
+370
+BR 1
+mean [signal-strength] of internet-particles-on patches with [pcolor = 17]
+1
+1
+11
+
+MONITOR
+600
+325
+667
+370
+BR 2
+mean [signal-strength] of internet-particles-on patches with [pcolor = 47]
+1
+1
+11
+
+MONITOR
+678
+325
+745
+370
+BR 3
+mean [signal-strength] of internet-particles-on patches with [pcolor = 57]
+1
+1
+11
 
 @#$#@#$#@
-## WHAT IS IT?
+#Overview
+##Purpose
+This model tries to identify the WiFi signal strength in every room of the house for every placement or location of the router. The model also determines the strength of the WiFi signal after it passes through walls or how far the signal has travelled.
 
-(a general understanding of what the model is trying to show or explain)
+##Entities
+The model contains the following entities:
+  1. Signal
+  2. Router
+  3. Wall
 
-## HOW IT WORKS
+##State Variables
+Each entity specified below has its own state variables.
 
-(what rules the agents use to create the overall behavior of the model)
+###Signal
+  * free-space-path-loss
+The loss of the signal on a unobstructed way.
 
-## HOW TO USE IT
+  * loss-from-attenuation
+The loss of the signal everytime it hits a wall.
 
-(how to use the model, including a description of each of the items in the Interface tab)
+  * distance-from-router
+The signal's distance from its spawn point - measured in number of patches.
 
-## THINGS TO NOTICE
+  * heading
+The angle as to which the signal is facing.
 
-(suggested things for the user to notice while running the model)
+  * signal-strength
+The strength of the signal; considering all the losses and the power output
 
-## THINGS TO TRY
+###Router
+  * router-x-coordinate and router-y-coordinate
+The position of the router in the world.
 
-(suggested things for the user to try to do (move sliders, switches, etc.) with the model)
+###Wall
+  * attenuation
+The attenuation value of the wall; or how much a signal will lose everytime it hits a wall.
 
-## EXTENDING THE MODEL
+##Scales
+Every 10 cm2 of space in the real world is represented by 1 patch in the model.
 
-(suggested things to add or change in the Code tab to make the model more complicated, detailed, accurate, etc.)
+##Process overview and scheduling
+WiFi signals spawn from the router’s point of origin. These signals follow a straight line when travelling. As the signal moves forward, its free space path loss (FSPL) is calculated. The number of times the signal hits a wall is taken into account. The total loss is calculated by adding FSPL to the attenuation factor which is the number of times the signal hit the wall multiplied by the attenuation value of the wall. The signal’s color is also identified after the total loss is accounted for. Its color representation is based from its total loss. 
 
-## NETLOGO FEATURES
+#Design Concepts
+##Basic Principles
+As a signal travels through space and through different materials, it loses its strength. 
+Each material that a signal passes through has a constant value which is a factor that reduces the signal strength.
 
-(interesting or unusual features of NetLogo that the model uses, particularly in the Code tab; or where workarounds were needed for missing features)
+##Emergence
+None
 
-## RELATED MODELS
+##Adaptation
+None
 
-(models in the NetLogo Models Library and elsewhere which are of related interest)
+##Objectives
+The signals have to disperse away from the router, following a straight line through the house. These signals move through the space and through walls as they disperse.
 
-## CREDITS AND REFERENCES
+##Learning
+None
 
-(a reference to the model's URL on the web if it has one, as well as any other necessary credits, citations, and links)
+##Prediction
+None
+
+##Sensing
+None
+
+##Interaction
+The signal decreases its strength when it passes through a wall.
+
+##Stochasticity
+The model represents the signal as circles that gets out of the router. The heading of a signal is randomly identified upon creation. 
+
+##Collectives
+None
+
+##Observation
+The mean signal strength of each room is calculated and then plotted in a graph. The trend of the graph shows how signal strength differs in each room, and for every placement of the router.
+
+#Detail
+##Initialization
+Every time the model is set-up, a floor plan is loaded together with the router which has a predefined coordinate.
+
+##Input Data
+  * House floor plan
+
+##Sub models
+###Attenuation
+A concrete cement block has a fixed attenuation value of **20**
+
+###Free Pace Path Loss
+The free space path loss (FSPL) is calculated with this equation:
+**FSPL = 20 log10(d) + 20 log10(f) - 87.55**
+_Where d is distance of particle from the router in meters; and f is the signal frequency in kHz_
+
+###Total Loss
+The total loss is calculated with this equation:
+**Total Loss = FSPL + (n * attenuation)**
+_Where n = number of walls passed through_
+
+###Power Output
+Every router has differing power outputs which can affectnthe strength of the signal. Below is the equation for solving the router's power output:
+**Power Output = 10 * log10(P(w)) + 30**
+_Where P(w) is the router's input power in Watts_
+
+###Signal Strength
+The strength of the signal that will be intercepted by a device can be computed with the following formula:
+**Signal Strength = Power Output - Total Loss**
+
+###Signal Representation
+The signal color are represented with the following:
+Range : Color
+[+∞,-50) : Green
+[-50,-60) : Yellow
+[-60,-70) : Orange
+[-70,-80) : Red
+[-80,-100) : Gray
+[-100,-∞) : Black
+
+_Each range is represented in dbm (deciBels below 1 Milliwatt) signals. These dbm signals shows that the minimum and maximum strength of a signal that is distributed in a negative form. The higher the dbm signal, the better. Thus, -50 dbm signal is better than -100._
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 @#$#@#$#@
 default
 true
@@ -713,6 +986,34 @@ NetLogo 6.0.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
+<experiments>
+  <experiment name="experiment" repetitions="1" sequentialRunOrder="false" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>mean [power-output - (free-space-path-loss + loss-from-attenuation)] of internet-particles-on patches with [pcolor = blue]</metric>
+    <metric>mean [power-output - (free-space-path-loss + loss-from-attenuation)] of internet-particles-on patches with [pcolor = orange]</metric>
+    <metric>mean [power-output - (free-space-path-loss + loss-from-attenuation)] of internet-particles-on patches with [pcolor = red]</metric>
+    <metric>mean [power-output - (free-space-path-loss + loss-from-attenuation)] of internet-particles-on patches with [pcolor = green]</metric>
+    <metric>mean [power-output - (free-space-path-loss + loss-from-attenuation)] of internet-particles-on patches with [pcolor = yellow]</metric>
+    <enumeratedValueSet variable="radio-wave-frequency">
+      <value value="2400000"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="floorplan-owner">
+      <value value="&quot;valerio&quot;"/>
+    </enumeratedValueSet>
+    <steppedValueSet variable="router-x-coordinate" first="0" step="5" last="120"/>
+    <steppedValueSet variable="router-y-coordinate" first="0" step="5" last="120"/>
+    <enumeratedValueSet variable="internet-particle-spawn-count">
+      <value value="25"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="spawn-interval">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="router-power">
+      <value value="6"/>
+    </enumeratedValueSet>
+  </experiment>
+</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default
